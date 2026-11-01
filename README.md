@@ -15,6 +15,18 @@
 - **高 DPI 适配**：开启 DPI 感知并按缩放比例换算换行宽度，150%/200% 缩放下文字不会挤成一列
 - **无账号、无数据库、不存历史**：只发请求，不落盘
 
+## 下载
+
+- **直接用**：[Releases · v1.0.0](https://github.com/HeyYeahYeahYeah/WordLens/releases/latest) 下载 `WordLens.exe`，双击运行，无需安装 Python
+- **源码运行**：
+
+```powershell
+git clone https://github.com/HeyYeahYeahYeah/WordLens.git
+cd WordLens
+pip install -r requirements.txt
+python main.py
+```
+
 ## 快速开始
 
 需要 Python 3.9+（Windows）：
