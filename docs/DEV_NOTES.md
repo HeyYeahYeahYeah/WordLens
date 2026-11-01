@@ -19,6 +19,17 @@
 - **该 anaconda-tk venv 缺 sqlite3.dll**：如果这个工具要存历史/配置，别用 sqlite3，PyInstaller 打包后会崩；用 JSON 文件更稳。
 - **`pyperclip.paste()` 在剪贴板被其他程序占用时会抛异常**：已 `try/except` 吞掉，下一轮继续轮询，不要让它把线程搞死。
 
+## 高分屏 DPI（2026-11-01 补）
+
+- **症状**：在 150% 缩放的屏幕上，悬浮窗跑到屏幕右下角外面，几乎看不见。
+- **根因**：进程没开 DPI 感知，Windows 会把 `winfo_screenwidth()` 等接口的返回值按缩放比例放大（实测 2560 的屏返回 3414），按这个坐标算出来的位置就在真实屏幕之外。
+- **修复**：`enable_dpi_awareness()` 在 `tk.Tk()` 之前调 `SetProcessDpiAwareness(2)`（失败退回 `SetProcessDPIAware()`）；`position()` 再把坐标夹回屏幕内。
+- **连带问题**：字体用「点」会随 DPI 放大，但 `wraplength` 是像素值，于是字变大、换行宽度不变，文字被挤成很窄的一列。改为按 `winfo_fpixels("1i")/96` 得到的缩放比换算 `wraplength`。
+
+## 演示模式
+
+`python main.py --demo`：跳过托盘和剪贴板监听，直接弹一张示例卡片。用于截图、预览界面，也方便改样式时快速看效果（不用真的去复制东西）。
+
 ## 已知限制 / 可以继续做的方向
 
 - 只做英译中；中译英、日/韩等可以照 `langpair` 扩展

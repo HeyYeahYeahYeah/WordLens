@@ -9,6 +9,7 @@
 """
 
 import ctypes
+import sys
 import threading
 import time
 import tkinter as tk
@@ -26,18 +27,58 @@ PAD = 20
 AUTO_HIDE_MS = 12000
 
 
+def enable_dpi_awareness():
+    """开启 DPI 感知。
+
+    不开启的话，系统会把 Tk 报告的屏幕尺寸按缩放比例放大（如 200% 下 1707px 变成
+    3414），悬浮窗按错误坐标定位就会跑到屏幕外。必须在 tk.Tk() 之前调用。
+    """
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)  # per-monitor aware
+        return
+    except Exception:
+        pass
+    try:
+        ctypes.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass
+
+
+
 # ----------------------------- 悬浮窗 -----------------------------
 class WordLens:
-    def __init__(self):
+    def __init__(self, demo=False):
         self.root = tk.Tk()
         self.root.withdraw()
         self.root.attributes("-topmost", True)
+        # 每逻辑英寸像素数 / 96 = 系统缩放比例（100% -> 1.0，150% -> 1.5）
+        try:
+            self.scale = max(1.0, self.root.winfo_fpixels("1i") / 96.0)
+        except Exception:
+            self.scale = 1.0
         self.win = None
         self.last_shown = ""
         self.auto_hide_id = None
-        self.build_tray()
-        threading.Thread(target=self.clip_loop, daemon=True).start()
+        if demo:
+            # 演示模式：不监听剪贴板、不建托盘，直接展示一个示例卡片（用于截图/预览）
+            self.root.after(800, self.render_demo)
+        else:
+            self.build_tray()
+            threading.Thread(target=self.clip_loop, daemon=True).start()
         self.root.mainloop()
+
+    # ---- 演示模式 ----
+    def render_demo(self):
+        self.render_word({
+            "word": "serendipity",
+            "uk": "ˌserənˈdɪpəti",
+            "us": "ˌserənˈdɪpəti",
+            "entries": [
+                ("n.", "意外发现美好事物的运气"),
+                ("n.", "机缘巧合；意外发现珍宝的运气"),
+            ],
+        })
+
 
     # ---- 系统托盘 ----
     def build_tray(self):
@@ -101,13 +142,14 @@ class WordLens:
 
     def position(self):
         self.win.update_idletasks()
-        w = self.win.winfo_width()
-        h = self.win.winfo_height()
+        w = max(self.win.winfo_width(), self.win.winfo_reqwidth())
+        h = max(self.win.winfo_height(), self.win.winfo_reqheight())
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
-        x = max(0, sw - w - PAD)
-        y = max(0, sh - h - PAD)
-        self.win.geometry(f"+{x}+{y}")
+        # 夹到屏幕内，避免坐标算出界导致窗口跑到屏幕外
+        x = max(0, min(sw - w - PAD, sw - w))
+        y = max(0, min(sh - h - PAD, sh - h))
+        self.win.geometry(f"+{int(x)}+{int(y)}")
 
     def show(self):
         fg = ctypes.windll.user32.GetForegroundWindow()
@@ -154,7 +196,7 @@ class WordLens:
                 tk.Label(row, text=pos, font=f_body, bg="white", fg="#3c3489",
                          width=6, anchor="w").pack(side="left")
             tk.Label(row, text=tran, font=f_body, bg="white", fg="#1a1a1a",
-                     anchor="w", wraplength=240, justify="left"
+                     anchor="w", wraplength=int(240 * self.scale), justify="left"
                      ).pack(side="left", fill="x", expand=True)
         self.build_footer()
         self.show()
@@ -166,10 +208,10 @@ class WordLens:
         f_src = tkfont.Font(size=11)
         f_dst = tkfont.Font(size=13)
         tk.Label(self.frame, text=src, font=f_src, bg="white", fg="#666",
-                 wraplength=260, justify="left", anchor="w"
+                 wraplength=int(260 * self.scale), justify="left", anchor="w"
                  ).pack(padx=12, pady=(10, 4))
         tk.Label(self.frame, text=dst, font=f_dst, bg="white", fg="#1a1a1a",
-                 wraplength=260, justify="left", anchor="w"
+                 wraplength=int(260 * self.scale), justify="left", anchor="w"
                  ).pack(padx=12, pady=(2, 4))
         self.build_footer()
         self.show()
@@ -179,7 +221,7 @@ class WordLens:
         self.ensure_win()
         self.last_shown = msg
         tk.Label(self.frame, text=msg, font=tkfont.Font(size=12), bg="white",
-                 fg="#a32d2d", wraplength=260, justify="left"
+                 fg="#a32d2d", wraplength=int(260 * self.scale), justify="left"
                  ).pack(padx=12, pady=14)
         self.build_footer()
         self.show()
@@ -203,4 +245,5 @@ class WordLens:
 
 
 if __name__ == "__main__":
-    WordLens()
+    enable_dpi_awareness()
+    WordLens(demo="--demo" in sys.argv)
